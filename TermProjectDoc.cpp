@@ -11,7 +11,7 @@
 #endif
 
 #include "TermProjectDoc.h"
-
+#include "COpenCVProcess.h"
 #include <propkey.h>
 
 #ifdef _DEBUG
@@ -23,6 +23,8 @@
 IMPLEMENT_DYNCREATE(CTermProjectDoc, CDocument)
 
 BEGIN_MESSAGE_MAP(CTermProjectDoc, CDocument)
+	ON_COMMAND(ID_ORIGINAL, &CTermProjectDoc::OnOriginal)
+	ON_COMMAND(ID_BINARIZE, &CTermProjectDoc::OnBinarize)
 END_MESSAGE_MAP()
 
 
@@ -31,11 +33,16 @@ END_MESSAGE_MAP()
 CTermProjectDoc::CTermProjectDoc() noexcept
 {
 	// TODO: 在此添加一次性构造代码
-
+	m_pDib = nullptr; // 初始化Dib指针为nullptr
+	m_pDibBackup = nullptr; // 初始化Dib备份指针为nullptr
 }
 
 CTermProjectDoc::~CTermProjectDoc()
 {
+	if (m_pDib != nullptr) // 如果Dib指针不为空
+		delete m_pDib; // 释放Dib指针
+	if (m_pDibBackup != nullptr)
+		delete m_pDibBackup;
 }
 
 BOOL CTermProjectDoc::OnNewDocument()
@@ -136,3 +143,45 @@ void CTermProjectDoc::Dump(CDumpContext& dc) const
 
 
 // CTermProjectDoc 命令
+
+BOOL CTermProjectDoc::OnOpenDocument(LPCTSTR lpszPathName)
+{
+	if (!CDocument::OnOpenDocument(lpszPathName))
+		return FALSE;
+
+	// TODO:  在此添加您专用的创建代码
+	if (m_pDib != nullptr) // 如果Dib指针不为空
+	{
+		delete m_pDib; // 释放Dib指针
+		m_pDib = nullptr; // 初始化Dib指针为nullptr
+	}
+	m_pDib = new CDib(); // 创建Dib指针
+	m_pDib->LoadFile(lpszPathName); // 加载文件
+	//创建备份
+	m_pDibBackup = new CDib(*m_pDib);
+
+	return TRUE;
+}
+
+void CTermProjectDoc::OnOriginal()
+{
+	// TODO: 在此添加命令处理程序代码
+	if (m_pDib != nullptr && m_pDibBackup != nullptr)
+	{
+		delete m_pDib; // 释放当前指针
+		m_pDib = new CDib(*m_pDibBackup); // 从备份重新创建
+		UpdateAllViews(NULL);
+	}
+}
+
+void CTermProjectDoc::OnBinarize()
+{
+	// TODO: 在此添加命令处理程序代码
+	if (m_pDib != nullptr)
+	{
+		COpenCVProcess cvProcess(m_pDib);
+		cvProcess.OpenCVBinarize(); // 调用OpenCV二值化处理
+		cvProcess.Mat2Dib(*m_pDib); // 将处理后的Mat转换回Dib
+		UpdateAllViews(NULL); // 更新所有视图
+	}
+}

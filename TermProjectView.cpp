@@ -51,7 +51,7 @@ BOOL CTermProjectView::PreCreateWindow(CREATESTRUCT& cs)
 
 // CTermProjectView 绘图
 
-void CTermProjectView::OnDraw(CDC* /*pDC*/)
+void CTermProjectView::OnDraw(CDC* pDC)
 {
 	CTermProjectDoc* pDoc = GetDocument();
 	ASSERT_VALID(pDoc);
@@ -59,6 +59,10 @@ void CTermProjectView::OnDraw(CDC* /*pDC*/)
 		return;
 
 	// TODO: 在此处为本机数据添加绘制代码
+	if (pDoc->m_pDib != nullptr)
+	{
+		pDoc->m_pDib->Draw(pDC->m_hDC, 0, 0);
+	}
 }
 
 
