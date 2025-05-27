@@ -52,4 +52,8 @@ public:
 	virtual BOOL OnOpenDocument(LPCTSTR lpszPathName);
 	afx_msg void OnOriginal();
 	afx_msg void OnBinarize();
+	afx_msg void OnRemoveHair();
+	afx_msg void OnFindContours();
+	afx_msg void OnDrawContoursOnOriginal();
+	afx_msg void OnInvertBinary();
 };

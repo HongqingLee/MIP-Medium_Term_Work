@@ -25,6 +25,10 @@ IMPLEMENT_DYNCREATE(CTermProjectDoc, CDocument)
 BEGIN_MESSAGE_MAP(CTermProjectDoc, CDocument)
 	ON_COMMAND(ID_ORIGINAL, &CTermProjectDoc::OnOriginal)
 	ON_COMMAND(ID_BINARIZE, &CTermProjectDoc::OnBinarize)
+	ON_COMMAND(ID_REMOVEHAIR, &CTermProjectDoc::OnRemoveHair)
+	ON_COMMAND(ID_FINDCONTOURS, &CTermProjectDoc::OnFindContours)
+	ON_COMMAND(ID_DRAWCONTOURSONORIGINAL, &CTermProjectDoc::OnDrawContoursOnOriginal)
+	ON_COMMAND(ID_INVERTBINARY, &CTermProjectDoc::OnInvertBinary)
 END_MESSAGE_MAP()
 
 
@@ -181,6 +185,89 @@ void CTermProjectDoc::OnBinarize()
 	{
 		COpenCVProcess cvProcess(m_pDib);
 		cvProcess.OpenCVBinarize(); // 调用OpenCV二值化处理
+		cvProcess.Mat2Dib(*m_pDib); // 将处理后的Mat转换回Dib
+		UpdateAllViews(NULL); // 更新所有视图
+	}
+}
+
+void CTermProjectDoc::OnRemoveHair()
+{
+	// TODO: 在此添加命令处理程序代码
+	if (m_pDib != nullptr)
+	{
+		COpenCVProcess cvProcess(m_pDib);
+		cvProcess.RemoveHair(); // 调用OpenCV去除头发处理
+		cvProcess.Mat2Dib(*m_pDib); // 将处理后的Mat转换回Dib
+		UpdateAllViews(NULL); // 更新所有视图
+	}
+}
+
+void CTermProjectDoc::OnFindContours()
+{
+	// TODO: 在此添加命令处理程序代码
+	if (m_pDib != nullptr) // 如果Dib指针不为空
+	{
+		COpenCVProcess opencvProcess(m_pDib); // 创建OpenCV处理对象
+		opencvProcess.FindContours(); // 调用OpenCV添加轮廓函数
+		opencvProcess.Mat2Dib(*m_pDib); // 将处理后的Mat转换回Dib
+		UpdateAllViews(NULL); // 更新视图
+	}
+}
+
+void CTermProjectDoc::OnDrawContoursOnOriginal()
+{
+	// TODO: 在此添加命令处理程序代码
+	if (m_pDib != nullptr && m_pDibBackup != nullptr)
+	{
+		// 直接获取当前的轮廓图像
+		COpenCVProcess contourProcess(m_pDib);
+		cv::Mat contourImage = contourProcess.cvimg.clone(); // 轮廓图像
+
+		// 获取原始图像
+		COpenCVProcess originalProcess(m_pDibBackup);
+		cv::Mat originalImage = originalProcess.cvimg.clone(); // 原始图像
+
+		// 根据通道数处理
+		if (originalImage.channels() == 1)
+			cv::cvtColor(originalImage, originalImage, cv::COLOR_GRAY2BGR);
+
+		// 直接绘制轮廓
+		// 通过二值化确保轮廓图像是二值的
+		cv::Mat binaryContour;
+		if (contourImage.channels() == 3)
+		{
+			cv::Mat grayContour;
+			cv::cvtColor(contourImage, grayContour, cv::COLOR_BGR2GRAY);
+			cv::threshold(grayContour, binaryContour, 128, 255, cv::THRESH_BINARY);
+		}
+		else
+		{
+			cv::threshold(contourImage, binaryContour, 128, 255, cv::THRESH_BINARY);
+		}
+
+		// 查找轮廓
+		std::vector<std::vector<cv::Point>> contours;
+		std::vector<cv::Vec4i> hierarchy;
+		cv::findContours(binaryContour.clone(), contours, hierarchy, cv::RETR_EXTERNAL, cv::CHAIN_APPROX_SIMPLE);
+
+		// 在原图上绘制绿色轮廓
+		cv::drawContours(originalImage, contours, -1, cv::Scalar(0, 255, 0), 1);
+
+		// 将结果复制回当前DIB
+		contourProcess.cvimg = originalImage;
+		contourProcess.Mat2Dib(*m_pDib);
+
+		UpdateAllViews(NULL); // 更新视图
+	}
+}
+
+void CTermProjectDoc::OnInvertBinary()
+{
+	// TODO: 在此添加命令处理程序代码
+	if (m_pDib != nullptr)
+	{
+		COpenCVProcess cvProcess(m_pDib);
+		cvProcess.InvertBinary(); // 调用OpenCV二值化反转处理
 		cvProcess.Mat2Dib(*m_pDib); // 将处理后的Mat转换回Dib
 		UpdateAllViews(NULL); // 更新所有视图
 	}

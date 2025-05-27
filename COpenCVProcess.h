@@ -23,5 +23,9 @@ public:
 	void Dib2Mat(CDib& dib);
 	void Mat2Dib(CDib& dib);
 	void OpenCVBinarize();
+	void RemoveHair();
+	void InvertBinary();
+	void FindContours();
+	void DrawContoursOnOriginal();
 };
 
