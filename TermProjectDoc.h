@@ -5,6 +5,7 @@
 
 #pragma once
 #include "Dib.h"
+#include "CImageDialog.h"
 #include<opencv2/opencv.hpp>
 
 class CTermProjectDoc : public CDocument
@@ -56,4 +57,10 @@ public:
 	afx_msg void OnFindContours();
 	afx_msg void OnDrawContoursOnOriginal();
 	afx_msg void OnInvertBinary();
+	afx_msg void OnShowSecondImage();
+
+private:
+	CImageDialog* m_pImageDlg;  // 非模态对话框指针
+public:
+	void SetImageDialogPtr(CImageDialog* pDlg);
 };

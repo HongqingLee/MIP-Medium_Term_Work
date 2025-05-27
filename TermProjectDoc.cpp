@@ -29,6 +29,7 @@ BEGIN_MESSAGE_MAP(CTermProjectDoc, CDocument)
 	ON_COMMAND(ID_FINDCONTOURS, &CTermProjectDoc::OnFindContours)
 	ON_COMMAND(ID_DRAWCONTOURSONORIGINAL, &CTermProjectDoc::OnDrawContoursOnOriginal)
 	ON_COMMAND(ID_INVERTBINARY, &CTermProjectDoc::OnInvertBinary)
+	ON_COMMAND(ID_SHOWIMAGE, &CTermProjectDoc::OnShowSecondImage)
 END_MESSAGE_MAP()
 
 
@@ -39,6 +40,7 @@ CTermProjectDoc::CTermProjectDoc() noexcept
 	// TODO: 在此添加一次性构造代码
 	m_pDib = nullptr; // 初始化Dib指针为nullptr
 	m_pDibBackup = nullptr; // 初始化Dib备份指针为nullptr
+	m_pImageDlg = nullptr; // 初始化非模态对话框指针
 }
 
 CTermProjectDoc::~CTermProjectDoc()
@@ -47,6 +49,13 @@ CTermProjectDoc::~CTermProjectDoc()
 		delete m_pDib; // 释放Dib指针
 	if (m_pDibBackup != nullptr)
 		delete m_pDibBackup;
+
+	// 关闭并删除非模态对话框
+	if (m_pImageDlg != nullptr)
+	{
+		m_pImageDlg->DestroyWindow(); // 这会触发PostNcDestroy
+		m_pImageDlg = nullptr;
+	}
 }
 
 BOOL CTermProjectDoc::OnNewDocument()
@@ -196,8 +205,14 @@ void CTermProjectDoc::OnRemoveHair()
 	if (m_pDib != nullptr)
 	{
 		COpenCVProcess cvProcess(m_pDib);
+
 		cvProcess.RemoveHair(); // 调用OpenCV去除头发处理
 		cvProcess.Mat2Dib(*m_pDib); // 将处理后的Mat转换回Dib
+		if (m_pDibBackup != nullptr)
+		{
+			delete m_pDibBackup; // 释放备份指针
+			m_pDibBackup = new CDib(*m_pDib); // 创建新的备份
+		}
 		UpdateAllViews(NULL); // 更新所有视图
 	}
 }
@@ -271,4 +286,24 @@ void CTermProjectDoc::OnInvertBinary()
 		cvProcess.Mat2Dib(*m_pDib); // 将处理后的Mat转换回Dib
 		UpdateAllViews(NULL); // 更新所有视图
 	}
+}
+
+void CTermProjectDoc::OnShowSecondImage()
+{
+	// 创建新的非模态对话框
+	if (m_pDib != nullptr) {
+		m_pImageDlg = new CImageDialog(m_pDib, this);
+		if (!m_pImageDlg->Create(IDD_IMAGE_DIALOG, AfxGetMainWnd())) {
+			delete m_pImageDlg;
+			m_pImageDlg = nullptr;
+			AfxMessageBox(_T("创建对话框失败！"));
+			return;
+		}
+		m_pImageDlg->ShowWindow(SW_SHOW);
+	}
+}
+
+void CTermProjectDoc::SetImageDialogPtr(CImageDialog* pDlg)
+{
+	m_pImageDlg = pDlg; // 设置对话框指针
 }
