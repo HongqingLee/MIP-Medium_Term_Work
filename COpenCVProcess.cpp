@@ -211,6 +211,7 @@ void COpenCVProcess::InvertBinary()
 
 	cvimg = ~cvimg;
 }
+
 void COpenCVProcess::FindContours()
 {
 	if (cvimg.empty())
@@ -309,4 +310,140 @@ void COpenCVProcess::DrawContoursOnOriginal()
 		// 在原图上绘制绿色轮廓
 		cv::drawContours(cvimg, contours, -1, cv::Scalar(0, 255, 0), 1);
 	}
+}
+
+void COpenCVProcess::FillHoles(cv::Mat& img)
+{
+	if (img.empty())
+		return;
+	auto floodFillBorders = [](cv::Mat& img, uchar fillValue) {
+		int rows = img.rows, cols = img.cols;
+		cv::Mat mask = cv::Mat::zeros(rows + 2, cols + 2, CV_8UC1);
+		for (int x = 0; x < cols; ++x) {
+			if (img.at<uchar>(0, x) == 0)
+				cv::floodFill(img, mask, cv::Point(x, 0), fillValue, 0, 0, 0, 4);
+			if (img.at<uchar>(rows - 1, x) == 0)
+				cv::floodFill(img, mask, cv::Point(x, rows - 1), fillValue, 0, 0, 0, 4);
+		}
+		for (int y = 0; y < rows; ++y) {
+			if (img.at<uchar>(y, 0) == 0)
+				cv::floodFill(img, mask, cv::Point(0, y), fillValue, 0, 0, 0, 4);
+			if (img.at<uchar>(y, cols - 1) == 0)
+				cv::floodFill(img, mask, cv::Point(cols - 1, y), fillValue, 0, 0, 0, 4);
+		}
+		};
+	cv::Mat temp = img.clone();
+	floodFillBorders(temp, 128);
+	for (int y = 0; y < temp.rows; ++y) {
+		for (int x = 0; x < temp.cols; ++x) {
+			if (temp.at<uchar>(y, x) == 0)
+				img.at<uchar>(y, x) = 255;
+			else if (temp.at<uchar>(y, x) == 128)
+				img.at<uchar>(y, x) = 0;
+		}
+	}
+}
+
+cv::Mat COpenCVProcess::ToGray(const cv::Mat& src)
+{
+	cv::Mat gray;
+	cv::cvtColor(src, gray, cv::COLOR_BGR2GRAY);
+	return gray;
+}
+
+cv::Mat COpenCVProcess::ToBinaryInv(const cv::Mat& gray)
+{
+	cv::Mat binary;
+	cv::threshold(gray, binary, 0, 255, cv::THRESH_BINARY_INV | cv::THRESH_OTSU);
+	return binary;
+}
+
+// 形态学开运算
+cv::Mat COpenCVProcess::MorphOpen(const cv::Mat& binary)
+{
+	cv::Mat kernel = cv::getStructuringElement(cv::MORPH_ELLIPSE, cv::Size(3, 3));
+	cv::Mat opening;
+	cv::morphologyEx(binary, opening, cv::MORPH_OPEN, kernel, cv::Point(-1, -1), 2);
+	return opening;
+}
+
+// 距离变换并归一化
+cv::Mat COpenCVProcess::DistanceTransformNorm(const cv::Mat& src)
+{
+	cv::Mat dist, dist_norm;
+	cv::distanceTransform(src, dist, cv::DIST_L2, 5);
+	cv::normalize(dist, dist_norm, 0, 255, cv::NORM_MINMAX);
+	dist_norm.convertTo(dist_norm, CV_8U);
+	return dist_norm;
+}
+
+// 获得细胞中心
+cv::Mat COpenCVProcess::GetSureForeground(const cv::Mat& dist)
+{
+	cv::Mat dist_norm_01;
+	cv::normalize(dist, dist_norm_01, 0, 1.0, cv::NORM_MINMAX);
+	double thresh = 0.1;
+	cv::Mat sure_fg;
+	cv::threshold(dist_norm_01, sure_fg, thresh, 1.0, cv::THRESH_BINARY);
+	sure_fg.convertTo(sure_fg, CV_8U, 255);
+	return sure_fg;
+}
+
+// 获得未知区域
+cv::Mat COpenCVProcess::GetUnknown(const cv::Mat& fillholes_fg, const cv::Mat& sure_fg)
+{
+	cv::Mat unknown;
+	cv::subtract(fillholes_fg, sure_fg, unknown);
+	return unknown;
+}
+
+// 连通域标记
+cv::Mat COpenCVProcess::GetMarkers(const cv::Mat& sure_fg, const cv::Mat& unknown)
+{
+	cv::Mat markers;
+	cv::connectedComponents(sure_fg, markers);
+	markers = markers + 1;
+	for (int i = 0; i < unknown.rows; ++i)
+		for (int j = 0; j < unknown.cols; ++j)
+			if (unknown.at<uchar>(i, j) == 255)
+				markers.at<int>(i, j) = 0;
+	return markers;
+}
+
+// 绘制分水岭边界
+void COpenCVProcess::DrawWatershedBoundary(cv::Mat& img, const cv::Mat& markers)
+{
+	int rows = markers.rows;
+	int cols = markers.cols;
+	for (int i = 1; i < rows - 1; i++)
+	{
+		for (int j = 1; j < cols - 1; j++)
+		{
+			if (markers.at<int>(i, j) == -1)
+			{
+				img.at<cv::Vec3b>(i, j) = cv::Vec3b(0, 255, 0);
+			}
+		}
+	}
+}
+
+void COpenCVProcess::OpenCVWatershed()
+{
+	if (cvimg.empty() || cvimg.channels() != 3)
+		return;
+
+	cv::Mat gray = ToGray(cvimg);
+	cv::Mat binary = ToBinaryInv(gray);
+	cv::Mat opening = MorphOpen(binary);
+
+	cv::Mat fillholes_fg = opening.clone();
+	FillHoles(fillholes_fg);
+
+	cv::Mat dist_norm = DistanceTransformNorm(fillholes_fg);
+	cv::Mat sure_fg = GetSureForeground(dist_norm);
+	cv::Mat unknown = GetUnknown(fillholes_fg, sure_fg);
+	cv::Mat markers = GetMarkers(sure_fg, unknown);
+
+	cv::watershed(cvimg, markers);
+	DrawWatershedBoundary(cvimg, markers);
 }

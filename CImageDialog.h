@@ -30,4 +30,5 @@ public:
 	afx_msg void OnPaint();
 	virtual void PostNcDestroy();
 	afx_msg void OnClose();
+	virtual BOOL OnInitDialog();
 };

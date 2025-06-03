@@ -61,3 +61,13 @@ void CImageDialog::OnClose()
 {
 	DestroyWindow();
 }
+
+BOOL CImageDialog::OnInitDialog()
+{
+	CDialogEx::OnInitDialog();
+
+	// TODO:  在此添加额外的初始化
+	SetWindowText(_T("Image Viewer"));
+	return TRUE;  // return TRUE unless you set the focus to a control
+	// 异常: OCX 属性页应返回 FALSE
+}

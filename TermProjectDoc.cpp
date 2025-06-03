@@ -30,6 +30,8 @@ BEGIN_MESSAGE_MAP(CTermProjectDoc, CDocument)
 	ON_COMMAND(ID_DRAWCONTOURSONORIGINAL, &CTermProjectDoc::OnDrawContoursOnOriginal)
 	ON_COMMAND(ID_INVERTBINARY, &CTermProjectDoc::OnInvertBinary)
 	ON_COMMAND(ID_SHOWIMAGE, &CTermProjectDoc::OnShowSecondImage)
+	ON_COMMAND(ID_GRAY, &CTermProjectDoc::OnGray)
+	ON_COMMAND(ID_BINARYINV, &CTermProjectDoc::OnBinaryInv)
 END_MESSAGE_MAP()
 
 
@@ -208,11 +210,6 @@ void CTermProjectDoc::OnRemoveHair()
 
 		cvProcess.RemoveHair(); // 调用OpenCV去除头发处理
 		cvProcess.Mat2Dib(*m_pDib); // 将处理后的Mat转换回Dib
-		if (m_pDibBackup != nullptr)
-		{
-			delete m_pDibBackup; // 释放备份指针
-			m_pDibBackup = new CDib(*m_pDib); // 创建新的备份
-		}
 		UpdateAllViews(NULL); // 更新所有视图
 	}
 }
@@ -306,4 +303,28 @@ void CTermProjectDoc::OnShowSecondImage()
 void CTermProjectDoc::SetImageDialogPtr(CImageDialog* pDlg)
 {
 	m_pImageDlg = pDlg; // 设置对话框指针
+}
+
+void CTermProjectDoc::OnGray()
+{
+	// 使用OpenCV显示灰度图像
+	if (m_pDib != nullptr)
+	{
+		COpenCVProcess cvProcess(m_pDib);
+		cv::Mat grayMat = cvProcess.ToGray(cvProcess.cvimg);
+		cv::imshow("Gray Image", grayMat);
+		cv::waitKey(0);
+	}
+}
+
+void CTermProjectDoc::OnBinaryInv()
+{
+	// TODO: 在此添加命令处理程序代码
+	if (m_pDib != nullptr)
+	{
+		COpenCVProcess cvProcess(m_pDib);
+		cvProcess.ToBinaryInv(cvProcess.cvimg); // 转换为反二值图像
+		cvProcess.Mat2Dib(*m_pDib); // 将处理后的Mat转换回Dib
+		UpdateAllViews(NULL); // 更新所有视图
+	}
 }

@@ -63,4 +63,6 @@ private:
 	CImageDialog* m_pImageDlg;  // 非模态对话框指针
 public:
 	void SetImageDialogPtr(CImageDialog* pDlg);
+	afx_msg void OnGray();
+	afx_msg void OnBinaryInv();
 };
