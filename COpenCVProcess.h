@@ -22,20 +22,17 @@ public:
 	//transfering between CDib and cv::Mat
 	void Dib2Mat(CDib& dib);
 	void Mat2Dib(CDib& dib);
-	void OpenCVBinarize();
-	void RemoveHair();
-	void InvertBinary();
 	void FindContours();
 	void DrawContoursOnOriginal();
-	void DrawWatershedBoundary(cv::Mat& img, const cv::Mat& markers);
 	void OpenCVWatershed();
-	void FillHoles(cv::Mat& img);
+
 	cv::Mat ToGray(const cv::Mat& src);
+	cv::Mat RemoveHair();
 	cv::Mat ToBinaryInv(const cv::Mat& gray);
 	cv::Mat MorphOpen(const cv::Mat& binary);
 	cv::Mat DistanceTransformNorm(const cv::Mat& src);
 	cv::Mat GetSureForeground(const cv::Mat& dist);
 	cv::Mat GetUnknown(const cv::Mat& fillholes_fg, const cv::Mat& sure_fg);
-	cv::Mat GetMarkers(const cv::Mat& sure_fg, const cv::Mat& unknown);
+	void DrawWatershedBoundary(cv::Mat& img, const cv::Mat& sure_fg, const cv::Mat& unknown);
 };
 

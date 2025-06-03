@@ -135,83 +135,6 @@ void COpenCVProcess::Mat2Dib(CDib& dib)
 	}
 }
 
-void COpenCVProcess::OpenCVBinarize()
-{
-	// 检查图像是否为空
-	if (cvimg.empty())
-	{
-		return;
-	}
-
-	// 动态计算阈值（使用大津法）
-	double threshold = 0;
-	if (cvimg.channels() == 1) // 灰度图像
-	{
-		threshold = cv::threshold(cvimg, cvimg, 0, 255, THRESH_BINARY | THRESH_OTSU);
-	}
-	else if (cvimg.channels() == 3) // 彩色图像
-	{
-		// 先将BGR转为灰度
-		cv::Mat gray;
-		cv::cvtColor(cvimg, gray, cv::COLOR_BGR2GRAY);
-		threshold = cv::threshold(gray, gray, 0, 255, THRESH_BINARY | THRESH_OTSU);
-		// 再将二值化结果映射回彩色图像
-		for (int i = 0; i < cvimg.rows; i++)
-		{
-			for (int j = 0; j < cvimg.cols; j++)
-			{
-				unsigned char value = gray.at<uchar>(i, j);
-				cv::Vec3b& pixel = cvimg.at<cv::Vec3b>(i, j);
-				pixel[0] = value;
-				pixel[1] = value;
-				pixel[2] = value;
-			}
-		}
-	}
-}
-
-void COpenCVProcess::RemoveHair()
-{
-    if (cvimg.empty())
-        return;
-
-    cv::Mat gray, mask, inpainted;
-
-    // 转为灰度图
-    if (cvimg.channels() == 3)
-        cv::cvtColor(cvimg, gray, cv::COLOR_BGR2GRAY);
-    else
-        gray = cvimg.clone();
-
-    // 黑色毛发检测：黑色细线，使用黑帽操作突出
-    cv::Mat blackhat;
-    cv::Mat kernel = cv::getStructuringElement(cv::MORPH_RECT, cv::Size(9, 9));
-    cv::morphologyEx(gray, blackhat, cv::MORPH_BLACKHAT, kernel);
-
-    // 二值化，提取毛发区域
-    cv::threshold(blackhat, mask, 10, 255, cv::THRESH_BINARY);
-
-    // 可选：形态学操作去除小噪声
-    cv::Mat kernel2 = cv::getStructuringElement(cv::MORPH_RECT, cv::Size(3, 3));
-    cv::morphologyEx(mask, mask, cv::MORPH_CLOSE, kernel2);
-
-    // 修复（去除毛发）
-    if (cvimg.channels() == 3)
-        cv::inpaint(cvimg, mask, cvimg, 1, cv::INPAINT_TELEA);
-    else
-        cv::inpaint(gray, mask, cvimg, 1, cv::INPAINT_TELEA);
-}
-
-void COpenCVProcess::InvertBinary()
-{
-	if (cvimg.empty())
-	{
-		return;
-	}
-
-	cvimg = ~cvimg;
-}
-
 void COpenCVProcess::FindContours()
 {
 	if (cvimg.empty())
@@ -312,37 +235,7 @@ void COpenCVProcess::DrawContoursOnOriginal()
 	}
 }
 
-void COpenCVProcess::FillHoles(cv::Mat& img)
-{
-	if (img.empty())
-		return;
-	auto floodFillBorders = [](cv::Mat& img, uchar fillValue) {
-		int rows = img.rows, cols = img.cols;
-		cv::Mat mask = cv::Mat::zeros(rows + 2, cols + 2, CV_8UC1);
-		for (int x = 0; x < cols; ++x) {
-			if (img.at<uchar>(0, x) == 0)
-				cv::floodFill(img, mask, cv::Point(x, 0), fillValue, 0, 0, 0, 4);
-			if (img.at<uchar>(rows - 1, x) == 0)
-				cv::floodFill(img, mask, cv::Point(x, rows - 1), fillValue, 0, 0, 0, 4);
-		}
-		for (int y = 0; y < rows; ++y) {
-			if (img.at<uchar>(y, 0) == 0)
-				cv::floodFill(img, mask, cv::Point(0, y), fillValue, 0, 0, 0, 4);
-			if (img.at<uchar>(y, cols - 1) == 0)
-				cv::floodFill(img, mask, cv::Point(cols - 1, y), fillValue, 0, 0, 0, 4);
-		}
-		};
-	cv::Mat temp = img.clone();
-	floodFillBorders(temp, 128);
-	for (int y = 0; y < temp.rows; ++y) {
-		for (int x = 0; x < temp.cols; ++x) {
-			if (temp.at<uchar>(y, x) == 0)
-				img.at<uchar>(y, x) = 255;
-			else if (temp.at<uchar>(y, x) == 128)
-				img.at<uchar>(y, x) = 0;
-		}
-	}
-}
+
 
 cv::Mat COpenCVProcess::ToGray(const cv::Mat& src)
 {
@@ -351,14 +244,50 @@ cv::Mat COpenCVProcess::ToGray(const cv::Mat& src)
 	return gray;
 }
 
+cv::Mat COpenCVProcess::RemoveHair()
+{
+	if (cvimg.empty())
+		return cv::Mat();
+
+	cv::Mat gray, mask, result;
+
+	// 转为灰度图
+	if (cvimg.channels() == 3)
+		cv::cvtColor(cvimg, gray, cv::COLOR_BGR2GRAY);
+	else
+		gray = cvimg.clone();
+
+	// 黑色毛发检测：黑色细线，使用黑帽操作突出
+	cv::Mat blackhat;
+	cv::Mat kernel = cv::getStructuringElement(cv::MORPH_RECT, cv::Size(9, 9));
+	cv::morphologyEx(gray, blackhat, cv::MORPH_BLACKHAT, kernel);
+
+	// 二值化，提取毛发区域
+	cv::threshold(blackhat, mask, 10, 255, cv::THRESH_BINARY);
+
+	// 形态学操作去除小噪声
+	cv::Mat kernel2 = cv::getStructuringElement(cv::MORPH_RECT, cv::Size(3, 3));
+	cv::morphologyEx(mask, mask, cv::MORPH_CLOSE, kernel2);
+
+	// 修复（去除毛发）
+	if (cvimg.channels() == 3)
+		cv::inpaint(cvimg, mask, result, 1, cv::INPAINT_TELEA);
+	else
+		cv::inpaint(gray, mask, result, 1, cv::INPAINT_TELEA);
+
+	return result;
+}
+
 cv::Mat COpenCVProcess::ToBinaryInv(const cv::Mat& gray)
 {
+	if (gray.channels() == 3)
+		return cv::Mat();
+
 	cv::Mat binary;
 	cv::threshold(gray, binary, 0, 255, cv::THRESH_BINARY_INV | cv::THRESH_OTSU);
 	return binary;
 }
 
-// 形态学开运算
 cv::Mat COpenCVProcess::MorphOpen(const cv::Mat& binary)
 {
 	cv::Mat kernel = cv::getStructuringElement(cv::MORPH_ELLIPSE, cv::Size(3, 3));
@@ -367,7 +296,6 @@ cv::Mat COpenCVProcess::MorphOpen(const cv::Mat& binary)
 	return opening;
 }
 
-// 距离变换并归一化
 cv::Mat COpenCVProcess::DistanceTransformNorm(const cv::Mat& src)
 {
 	cv::Mat dist, dist_norm;
@@ -377,7 +305,6 @@ cv::Mat COpenCVProcess::DistanceTransformNorm(const cv::Mat& src)
 	return dist_norm;
 }
 
-// 获得细胞中心
 cv::Mat COpenCVProcess::GetSureForeground(const cv::Mat& dist)
 {
 	cv::Mat dist_norm_01;
@@ -389,16 +316,14 @@ cv::Mat COpenCVProcess::GetSureForeground(const cv::Mat& dist)
 	return sure_fg;
 }
 
-// 获得未知区域
-cv::Mat COpenCVProcess::GetUnknown(const cv::Mat& fillholes_fg, const cv::Mat& sure_fg)
+cv::Mat COpenCVProcess::GetUnknown(const cv::Mat&sure_bg , const cv::Mat& sure_fg)
 {
 	cv::Mat unknown;
-	cv::subtract(fillholes_fg, sure_fg, unknown);
+	cv::subtract(sure_bg, sure_fg, unknown);
 	return unknown;
 }
 
-// 连通域标记
-cv::Mat COpenCVProcess::GetMarkers(const cv::Mat& sure_fg, const cv::Mat& unknown)
+void COpenCVProcess::DrawWatershedBoundary(cv::Mat& img, const cv::Mat& sure_fg, const cv::Mat& unknown)
 {
 	cv::Mat markers;
 	cv::connectedComponents(sure_fg, markers);
@@ -407,12 +332,11 @@ cv::Mat COpenCVProcess::GetMarkers(const cv::Mat& sure_fg, const cv::Mat& unknow
 		for (int j = 0; j < unknown.cols; ++j)
 			if (unknown.at<uchar>(i, j) == 255)
 				markers.at<int>(i, j) = 0;
-	return markers;
-}
 
-// 绘制分水岭边界
-void COpenCVProcess::DrawWatershedBoundary(cv::Mat& img, const cv::Mat& markers)
-{
+	// 分水岭
+	cv::watershed(img, markers);
+
+	// 绘制分水岭边界
 	int rows = markers.rows;
 	int cols = markers.cols;
 	for (int i = 1; i < rows - 1; i++)
@@ -437,13 +361,9 @@ void COpenCVProcess::OpenCVWatershed()
 	cv::Mat opening = MorphOpen(binary);
 
 	cv::Mat fillholes_fg = opening.clone();
-	FillHoles(fillholes_fg);
 
 	cv::Mat dist_norm = DistanceTransformNorm(fillholes_fg);
 	cv::Mat sure_fg = GetSureForeground(dist_norm);
 	cv::Mat unknown = GetUnknown(fillholes_fg, sure_fg);
-	cv::Mat markers = GetMarkers(sure_fg, unknown);
 
-	cv::watershed(cvimg, markers);
-	DrawWatershedBoundary(cvimg, markers);
 }

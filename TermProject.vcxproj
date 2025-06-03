@@ -186,7 +186,6 @@
     </ResourceCompile>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClInclude Include="CImageDialog.h" />
     <ClInclude Include="COpenCVProcess.h" />
     <ClInclude Include="Dib.h" />
     <ClInclude Include="framework.h" />
@@ -199,7 +198,6 @@
     <ClInclude Include="TermProjectView.h" />
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="CImageDialog.cpp" />
     <ClCompile Include="COpenCVProcess.cpp" />
     <ClCompile Include="Dib.cpp" />
     <ClCompile Include="MainFrm.cpp" />

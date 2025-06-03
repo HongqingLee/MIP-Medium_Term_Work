@@ -5,7 +5,6 @@
 
 #pragma once
 #include "Dib.h"
-#include "CImageDialog.h"
 #include<opencv2/opencv.hpp>
 
 class CTermProjectDoc : public CDocument
@@ -40,6 +39,14 @@ public:
 #endif
 
 protected:
+	cv::Mat m_grayMat;
+	cv::Mat m_hairRemovedMat;
+	cv::Mat m_binaryInvMat;
+	cv::Mat m_morphOpenMat;
+	cv::Mat m_distTransMat;
+	cv::Mat m_sureFgMat;
+	cv::Mat m_unknownMat;
+	cv::Mat m_markersMat;
 
 // 生成的消息映射函数
 protected:
@@ -52,17 +59,15 @@ protected:
 public:
 	virtual BOOL OnOpenDocument(LPCTSTR lpszPathName);
 	afx_msg void OnOriginal();
-	afx_msg void OnBinarize();
 	afx_msg void OnRemoveHair();
-	afx_msg void OnFindContours();
 	afx_msg void OnDrawContoursOnOriginal();
-	afx_msg void OnInvertBinary();
-	afx_msg void OnShowSecondImage();
 
-private:
-	CImageDialog* m_pImageDlg;  // 非模态对话框指针
 public:
-	void SetImageDialogPtr(CImageDialog* pDlg);
 	afx_msg void OnGray();
 	afx_msg void OnBinaryInv();
+	afx_msg void OnMorphOpen();
+	afx_msg void OnDistanceTransform();
+	afx_msg void OnSureForeground();
+	afx_msg void OnUnknown();
+	afx_msg void OnDrawWatershedBoundary();
 };

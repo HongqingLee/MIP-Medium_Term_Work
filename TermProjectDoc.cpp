@@ -24,14 +24,15 @@ IMPLEMENT_DYNCREATE(CTermProjectDoc, CDocument)
 
 BEGIN_MESSAGE_MAP(CTermProjectDoc, CDocument)
 	ON_COMMAND(ID_ORIGINAL, &CTermProjectDoc::OnOriginal)
-	ON_COMMAND(ID_BINARIZE, &CTermProjectDoc::OnBinarize)
 	ON_COMMAND(ID_REMOVEHAIR, &CTermProjectDoc::OnRemoveHair)
-	ON_COMMAND(ID_FINDCONTOURS, &CTermProjectDoc::OnFindContours)
 	ON_COMMAND(ID_DRAWCONTOURSONORIGINAL, &CTermProjectDoc::OnDrawContoursOnOriginal)
-	ON_COMMAND(ID_INVERTBINARY, &CTermProjectDoc::OnInvertBinary)
-	ON_COMMAND(ID_SHOWIMAGE, &CTermProjectDoc::OnShowSecondImage)
 	ON_COMMAND(ID_GRAY, &CTermProjectDoc::OnGray)
 	ON_COMMAND(ID_BINARYINV, &CTermProjectDoc::OnBinaryInv)
+	ON_COMMAND(ID_MORPHOPEN, &CTermProjectDoc::OnMorphOpen)
+	ON_COMMAND(ID_DISTANCETRANSFORM, &CTermProjectDoc::OnDistanceTransform)
+	ON_COMMAND(ID_SUREFOREGROUND, &CTermProjectDoc::OnSureForeground)
+	ON_COMMAND(ID_UNKNOWN, &CTermProjectDoc::OnUnknown)
+	ON_COMMAND(ID_WATERSHEDBOUNDARY, &CTermProjectDoc::OnDrawWatershedBoundary)
 END_MESSAGE_MAP()
 
 
@@ -42,7 +43,6 @@ CTermProjectDoc::CTermProjectDoc() noexcept
 	// TODO: 在此添加一次性构造代码
 	m_pDib = nullptr; // 初始化Dib指针为nullptr
 	m_pDibBackup = nullptr; // 初始化Dib备份指针为nullptr
-	m_pImageDlg = nullptr; // 初始化非模态对话框指针
 }
 
 CTermProjectDoc::~CTermProjectDoc()
@@ -51,13 +51,6 @@ CTermProjectDoc::~CTermProjectDoc()
 		delete m_pDib; // 释放Dib指针
 	if (m_pDibBackup != nullptr)
 		delete m_pDibBackup;
-
-	// 关闭并删除非模态对话框
-	if (m_pImageDlg != nullptr)
-	{
-		m_pImageDlg->DestroyWindow(); // 这会触发PostNcDestroy
-		m_pImageDlg = nullptr;
-	}
 }
 
 BOOL CTermProjectDoc::OnNewDocument()
@@ -189,43 +182,6 @@ void CTermProjectDoc::OnOriginal()
 	}
 }
 
-void CTermProjectDoc::OnBinarize()
-{
-	// TODO: 在此添加命令处理程序代码
-	if (m_pDib != nullptr)
-	{
-		COpenCVProcess cvProcess(m_pDib);
-		cvProcess.OpenCVBinarize(); // 调用OpenCV二值化处理
-		cvProcess.Mat2Dib(*m_pDib); // 将处理后的Mat转换回Dib
-		UpdateAllViews(NULL); // 更新所有视图
-	}
-}
-
-void CTermProjectDoc::OnRemoveHair()
-{
-	// TODO: 在此添加命令处理程序代码
-	if (m_pDib != nullptr)
-	{
-		COpenCVProcess cvProcess(m_pDib);
-
-		cvProcess.RemoveHair(); // 调用OpenCV去除头发处理
-		cvProcess.Mat2Dib(*m_pDib); // 将处理后的Mat转换回Dib
-		UpdateAllViews(NULL); // 更新所有视图
-	}
-}
-
-void CTermProjectDoc::OnFindContours()
-{
-	// TODO: 在此添加命令处理程序代码
-	if (m_pDib != nullptr) // 如果Dib指针不为空
-	{
-		COpenCVProcess opencvProcess(m_pDib); // 创建OpenCV处理对象
-		opencvProcess.FindContours(); // 调用OpenCV添加轮廓函数
-		opencvProcess.Mat2Dib(*m_pDib); // 将处理后的Mat转换回Dib
-		UpdateAllViews(NULL); // 更新视图
-	}
-}
-
 void CTermProjectDoc::OnDrawContoursOnOriginal()
 {
 	// TODO: 在此添加命令处理程序代码
@@ -273,47 +229,37 @@ void CTermProjectDoc::OnDrawContoursOnOriginal()
 	}
 }
 
-void CTermProjectDoc::OnInvertBinary()
-{
-	// TODO: 在此添加命令处理程序代码
-	if (m_pDib != nullptr)
-	{
-		COpenCVProcess cvProcess(m_pDib);
-		cvProcess.InvertBinary(); // 调用OpenCV二值化反转处理
-		cvProcess.Mat2Dib(*m_pDib); // 将处理后的Mat转换回Dib
-		UpdateAllViews(NULL); // 更新所有视图
-	}
-}
-
-void CTermProjectDoc::OnShowSecondImage()
-{
-	// 创建新的非模态对话框
-	if (m_pDib != nullptr) {
-		m_pImageDlg = new CImageDialog(m_pDib, this);
-		if (!m_pImageDlg->Create(IDD_IMAGE_DIALOG, AfxGetMainWnd())) {
-			delete m_pImageDlg;
-			m_pImageDlg = nullptr;
-			AfxMessageBox(_T("创建对话框失败！"));
-			return;
-		}
-		m_pImageDlg->ShowWindow(SW_SHOW);
-	}
-}
-
-void CTermProjectDoc::SetImageDialogPtr(CImageDialog* pDlg)
-{
-	m_pImageDlg = pDlg; // 设置对话框指针
-}
-
 void CTermProjectDoc::OnGray()
 {
 	// 使用OpenCV显示灰度图像
 	if (m_pDib != nullptr)
 	{
 		COpenCVProcess cvProcess(m_pDib);
-		cv::Mat grayMat = cvProcess.ToGray(cvProcess.cvimg);
-		cv::imshow("Gray Image", grayMat);
+		m_grayMat = cvProcess.ToGray(cvProcess.cvimg);
+		cvProcess.cvimg = m_grayMat;
+		cvProcess.Mat2Dib(*m_pDib);
+		cv::namedWindow("Gray Image", cv::WINDOW_NORMAL);
+		cv::setWindowProperty("Gray Image", cv::WND_PROP_TOPMOST, 1);
+		cv::imshow("Gray Image", m_grayMat);
 		cv::waitKey(0);
+		UpdateAllViews(NULL);
+	}
+}
+
+void CTermProjectDoc::OnRemoveHair()
+{
+	// TODO: 在此添加命令处理程序代码
+	if (m_pDib != nullptr)
+	{
+		COpenCVProcess cvProcess(m_pDib);
+		m_hairRemovedMat = cvProcess.RemoveHair();
+		cvProcess.cvimg = m_hairRemovedMat;
+		cvProcess.Mat2Dib(*m_pDib);
+		cv::namedWindow("Hair Removed Image", cv::WINDOW_NORMAL);
+		cv::setWindowProperty("Hair Removed Image", cv::WND_PROP_TOPMOST, 1);
+		cv::imshow("Hair Removed Image", m_hairRemovedMat);
+		cv::waitKey(0);
+		UpdateAllViews(NULL);
 	}
 }
 
@@ -323,8 +269,98 @@ void CTermProjectDoc::OnBinaryInv()
 	if (m_pDib != nullptr)
 	{
 		COpenCVProcess cvProcess(m_pDib);
-		cvProcess.ToBinaryInv(cvProcess.cvimg); // 转换为反二值图像
-		cvProcess.Mat2Dib(*m_pDib); // 将处理后的Mat转换回Dib
-		UpdateAllViews(NULL); // 更新所有视图
+		m_binaryInvMat = cvProcess.ToBinaryInv(cvProcess.cvimg);
+		cvProcess.cvimg = m_binaryInvMat;
+		cvProcess.Mat2Dib(*m_pDib);
+		cv::namedWindow("Binary Inverted Image", cv::WINDOW_NORMAL);
+		cv::setWindowProperty("Binary Inverted Image", cv::WND_PROP_TOPMOST, 1);
+		cv::imshow("Binary Inverted Image", m_binaryInvMat);
+		cv::waitKey(0);
+		UpdateAllViews(NULL);
+	}
+}
+
+void CTermProjectDoc::OnMorphOpen()
+{
+	// TODO: 在此添加命令处理程序代码
+	if (m_pDib != nullptr)
+	{
+		COpenCVProcess cvProcess(m_pDib);
+		m_morphOpenMat = cvProcess.MorphOpen(cvProcess.cvimg);
+		cvProcess.cvimg = m_morphOpenMat;
+		cvProcess.Mat2Dib(*m_pDib);
+		cv::namedWindow("Morphological Opening Image", cv::WINDOW_NORMAL);
+		cv::setWindowProperty("Morphological Opening Image", cv::WND_PROP_TOPMOST, 1);
+		cv::imshow("Morphological Opening Image", m_morphOpenMat);
+		cv::waitKey(0);
+		UpdateAllViews(NULL);
+	}
+}
+
+void CTermProjectDoc::OnDistanceTransform()
+{
+	// TODO: 在此添加命令处理程序代码
+	if (m_pDib != nullptr)
+	{
+		COpenCVProcess cvProcess(m_pDib);
+		m_distTransMat = cvProcess.DistanceTransformNorm(cvProcess.cvimg);
+		cvProcess.cvimg = m_distTransMat;
+		cvProcess.Mat2Dib(*m_pDib);
+		cv::namedWindow("Distance Transform Image", cv::WINDOW_NORMAL);
+		cv::setWindowProperty("Distance Transform Image", cv::WND_PROP_TOPMOST, 1);
+		cv::imshow("Distance Transform Image", m_distTransMat);
+		cv::waitKey(0);
+		UpdateAllViews(NULL);
+	}
+}
+
+void CTermProjectDoc::OnSureForeground()
+{
+	// TODO: 在此添加命令处理程序代码
+	if (m_pDib != nullptr)
+	{
+		COpenCVProcess cvProcess(m_pDib);
+		m_sureFgMat = cvProcess.GetSureForeground(m_distTransMat);
+		cvProcess.cvimg = m_sureFgMat;
+		cvProcess.Mat2Dib(*m_pDib);
+		cv::namedWindow("Sure Foreground Image", cv::WINDOW_NORMAL);
+		cv::setWindowProperty("Sure Foreground Image", cv::WND_PROP_TOPMOST, 1);
+		cv::imshow("Sure Foreground Image", m_sureFgMat);
+		cv::waitKey(0);
+		UpdateAllViews(NULL);
+	}
+}
+
+void CTermProjectDoc::OnUnknown()
+{
+	// TODO: 在此添加命令处理程序代码
+	if (m_pDib != nullptr)
+	{
+		COpenCVProcess cvProcess(m_pDib);
+		m_unknownMat = cvProcess.GetUnknown(m_morphOpenMat, m_sureFgMat);
+		cvProcess.cvimg = m_unknownMat;
+		cvProcess.Mat2Dib(*m_pDib);
+		cv::namedWindow("Unknown Image", cv::WINDOW_NORMAL);
+		cv::setWindowProperty("Unknown Image", cv::WND_PROP_TOPMOST, 1);
+		cv::imshow("Unknown Image", m_unknownMat);
+		cv::waitKey(0);
+		UpdateAllViews(NULL);
+	}
+}
+
+void CTermProjectDoc::OnDrawWatershedBoundary()
+{
+	// TODO: 在此添加命令处理程序代码
+	if (m_pDib != nullptr && !m_sureFgMat.empty() && !m_unknownMat.empty())
+	{
+		COpenCVProcess cvProcess(m_pDibBackup);
+		cvProcess.DrawWatershedBoundary(cvProcess.cvimg, m_sureFgMat, m_unknownMat);
+		cv::Mat watershedInput = cvProcess.cvimg.clone(); // 获取分水岭处理后的图像
+		cvProcess.Mat2Dib(*m_pDib);
+		cv::namedWindow("Watershed Boundary Image", cv::WINDOW_NORMAL);
+		cv::setWindowProperty("Watershed Boundary Image", cv::WND_PROP_TOPMOST, 1);
+		cv::imshow("Watershed Boundary Image", watershedInput);
+		cv::waitKey(0);
+		UpdateAllViews(NULL);
 	}
 }
