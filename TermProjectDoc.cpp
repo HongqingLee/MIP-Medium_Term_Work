@@ -33,6 +33,7 @@ BEGIN_MESSAGE_MAP(CTermProjectDoc, CDocument)
 	ON_COMMAND(ID_SUREFOREGROUND, &CTermProjectDoc::OnSureForeground)
 	ON_COMMAND(ID_UNKNOWN, &CTermProjectDoc::OnUnknown)
 	ON_COMMAND(ID_WATERSHEDBOUNDARY, &CTermProjectDoc::OnDrawWatershedBoundary)
+	ON_COMMAND(ID_WATERSHED, &CTermProjectDoc::OnWatershed)
 END_MESSAGE_MAP()
 
 
@@ -355,12 +356,29 @@ void CTermProjectDoc::OnDrawWatershedBoundary()
 	{
 		COpenCVProcess cvProcess(m_pDibBackup);
 		cvProcess.DrawWatershedBoundary(cvProcess.cvimg, m_sureFgMat, m_unknownMat);
-		cv::Mat watershedInput = cvProcess.cvimg.clone(); // 获取分水岭处理后的图像
+		m_watershedInput = cvProcess.cvimg.clone(); // 获取分水岭处理后的图像
 		cvProcess.Mat2Dib(*m_pDib);
+		UpdateAllViews(NULL);
 		cv::namedWindow("Watershed Boundary Image", cv::WINDOW_NORMAL);
 		cv::setWindowProperty("Watershed Boundary Image", cv::WND_PROP_TOPMOST, 1);
-		cv::imshow("Watershed Boundary Image", watershedInput);
+		cv::imshow("Watershed Boundary Image", m_watershedInput);
 		cv::waitKey(0);
+	}
+}
+
+void CTermProjectDoc::OnWatershed()
+{
+	// 使用OpenCV进行分水岭分割
+	if (m_pDib != nullptr)
+	{
+		COpenCVProcess cvProcess(m_pDib);
+		cvProcess.OpenCVWatershed(); // 执行分水岭算法，内部应处理m_sureFgMat和m_unknownMat
+		m_markersMat = cvProcess.cvimg.clone(); // 获取分水岭分割结果
+		cvProcess.Mat2Dib(*m_pDib);
 		UpdateAllViews(NULL);
+		cv::namedWindow("Watershed Result Image", cv::WINDOW_NORMAL);
+		cv::setWindowProperty("Watershed Result Image", cv::WND_PROP_TOPMOST, 1);
+		cv::imshow("Watershed Result Image", m_markersMat);
+		cv::waitKey(0);
 	}
 }

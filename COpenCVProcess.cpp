@@ -353,17 +353,75 @@ void COpenCVProcess::DrawWatershedBoundary(cv::Mat& img, const cv::Mat& sure_fg,
 
 void COpenCVProcess::OpenCVWatershed()
 {
-	if (cvimg.empty() || cvimg.channels() != 3)
+	// 检查输入图像
+	if (cvimg.empty())
 		return;
 
-	cv::Mat gray = ToGray(cvimg);
+	// 保存原图以便后续绘制
+	cv::Mat original = cvimg.clone();
+
+	// 将图像转为灰度
+	cv::Mat gray;
+	if (cvimg.channels() == 3)
+		gray = ToGray(cvimg);
+	else
+		gray = cvimg.clone();
+
+	// 二值化（反转）
 	cv::Mat binary = ToBinaryInv(gray);
+
+	// 形态学开操作以去除噪声
 	cv::Mat opening = MorphOpen(binary);
 
-	cv::Mat fillholes_fg = opening.clone();
+	// 确定的背景区域
+	cv::Mat sure_bg = opening.clone();
 
-	cv::Mat dist_norm = DistanceTransformNorm(fillholes_fg);
-	cv::Mat sure_fg = GetSureForeground(dist_norm);
-	cv::Mat unknown = GetUnknown(fillholes_fg, sure_fg);
+	// 距离变换获取潜在的前景标记
+	cv::Mat dist_transform = DistanceTransformNorm(opening);
 
+	// 获取确定的前景区域
+	cv::Mat sure_fg = GetSureForeground(dist_transform);
+
+	// 获取未知区域（背景与前景之间的区域）
+	cv::Mat unknown = GetUnknown(sure_bg, sure_fg);
+
+	// 将原图设置为彩色以便绘制有色边界
+	cv::Mat result;
+	if (original.channels() == 1)
+		cv::cvtColor(original, result, cv::COLOR_GRAY2BGR);
+	else
+		result = original.clone();
+
+	// 创建标记图像
+	cv::Mat markers;
+	cv::connectedComponents(sure_fg, markers);
+	// 将标记图像的值加1，确保背景为0
+	markers = markers + 1;
+	// 将未知区域标记为0
+	for (int i = 0; i < unknown.rows; ++i)
+	{
+		for (int j = 0; j < unknown.cols; ++j)
+		{
+			if (unknown.at<uchar>(i, j) == 255)
+			{
+				markers.at<int>(i, j) = 0;
+			}
+		}
+	}
+	// 执行分水岭算法
+	cv::watershed(result, markers);
+	// 绘制分水岭边界
+	for (int i = 1; i < markers.rows; ++i)
+	{
+		for (int j = 1; j < markers.cols; ++j)
+		{
+			if (markers.at<int>(i, j) == -1) // 分水岭边界
+			{
+				result.at<cv::Vec3b>(i, j) = cv::Vec3b(0, 255, 0); // 绿色边界
+			}
+		}
+	}
+
+	// 将结果保存回cvimg
+	cvimg = result.clone();
 }

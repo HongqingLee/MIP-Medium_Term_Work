@@ -47,6 +47,7 @@ protected:
 	cv::Mat m_sureFgMat;
 	cv::Mat m_unknownMat;
 	cv::Mat m_markersMat;
+	cv::Mat m_watershedInput;
 
 // 生成的消息映射函数
 protected:
@@ -70,4 +71,5 @@ public:
 	afx_msg void OnSureForeground();
 	afx_msg void OnUnknown();
 	afx_msg void OnDrawWatershedBoundary();
+	afx_msg void OnWatershed();
 };
