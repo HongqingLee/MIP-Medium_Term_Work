@@ -73,4 +73,5 @@ public:
 	afx_msg void OnUnknown();
 	afx_msg void OnDrawWatershedBoundary();
 	afx_msg void OnWatershed();
+	afx_msg void OnExtractLesionFeatures();
 };

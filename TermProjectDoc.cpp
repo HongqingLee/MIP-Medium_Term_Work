@@ -34,6 +34,7 @@ BEGIN_MESSAGE_MAP(CTermProjectDoc, CDocument)
 	ON_COMMAND(ID_UNKNOWN, &CTermProjectDoc::OnUnknown)
 	ON_COMMAND(ID_WATERSHEDBOUNDARY, &CTermProjectDoc::OnDrawWatershedBoundary)
 	ON_COMMAND(ID_WATERSHED, &CTermProjectDoc::OnWatershed)
+	ON_COMMAND(ID_EXTRACTFRATURES, &CTermProjectDoc::OnExtractLesionFeatures)
 END_MESSAGE_MAP()
 
 
@@ -355,12 +356,12 @@ void CTermProjectDoc::OnDrawWatershedBoundary()
 	if (m_pDib != nullptr)
 	{
 		COpenCVProcess cvProcess(m_pDibBackup);
-		m_watershedInput = cvProcess.DrawWatershedBoundary(cvProcess.cvimg, m_sureFgMat, m_unknownMat);
-		cvProcess.cvimg = m_watershedInput;
+		m_markersMat = cvProcess.DrawWatershedBoundary(cvProcess.cvimg, m_sureFgMat, m_unknownMat);
+		cvProcess.cvimg = m_markersMat;
 		cvProcess.Mat2Dib(*m_pDib);
 		cv::namedWindow("Watershed Boundary Image", cv::WINDOW_NORMAL);
 		cv::setWindowProperty("Watershed Boundary Image", cv::WND_PROP_TOPMOST, 1);
-		cv::imshow("Watershed Boundary Image", m_watershedInput);
+		cv::imshow("Watershed Boundary Image", m_markersMat);
 		cv::waitKey(0);
 		UpdateAllViews(NULL);
 	}
@@ -383,3 +384,49 @@ void CTermProjectDoc::OnWatershed()
 	}
 }
 
+void CTermProjectDoc::OnExtractLesionFeatures()
+{
+	// TODO: 在此添加命令处理程序代码
+	if (m_pDib != nullptr)
+	{
+		COpenCVProcess cvProcess(m_pDib);
+
+        // 提取病变区域特征
+        // 1. 获取当前图像的Mat
+        cv::Mat srcMat;
+        cvProcess.Dib2Mat(*m_pDib);
+        srcMat = cvProcess.cvimg;
+
+        // 2. 生成掩膜（假设病变区域为非黑色像素，或可根据实际情况调整）
+        cv::Mat mask;
+        if (srcMat.channels() == 3) {
+        cv::Mat gray;
+        cv::cvtColor(srcMat, gray, cv::COLOR_BGR2GRAY);
+        cv::threshold(gray, mask, 10, 255, cv::THRESH_BINARY);
+        } else {
+        cv::threshold(srcMat, mask, 10, 255, cv::THRESH_BINARY);
+        }
+
+        // 3. 调用特征提取
+        LesionFeatures features = cvProcess.ExtractLesionFeatures(srcMat, mask);
+		// 构建结果字符串
+		CString result;
+		result.Format(_T("颜色特征:\r\n")
+			_T("平均BGR值: B=%.2f, G=%.2f, R=%.2f\r\n")
+			_T("标准差: B=%.2f, G=%.2f, R=%.2f\r\n\r\n")
+			_T("形状特征:\r\n")
+			_T("圆形度: %.2f\r\n")
+			_T("不规则度: %.2f\r\n\r\n")
+			_T("纹理特征:\r\n")
+			_T("对比度: %.2f\r\n\r\n")
+			_T("边缘特征:\r\n")
+			_T("平均梯度: %.2f"),
+			features.colorMean[0], features.colorMean[1], features.colorMean[2],
+			features.colorStd[0], features.colorStd[1], features.colorStd[2],
+			features.circularity, features.irregularity,
+			features.contrast, features.edgeGradientMean);
+
+		MessageBox(NULL, result, _T("图像特征提取结果"), MB_OK | MB_ICONINFORMATION);
+
+	}
+}

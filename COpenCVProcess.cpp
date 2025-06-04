@@ -235,8 +235,6 @@ void COpenCVProcess::DrawContoursOnOriginal()
 	}
 }
 
-
-
 cv::Mat COpenCVProcess::ToGray(const cv::Mat& src)
 {
 	cv::Mat gray;
@@ -367,6 +365,15 @@ void COpenCVProcess::OpenCVWatershed()
 	// 保存原图以便后续绘制
 	cv::Mat original = cvimg.clone();
 
+	// 弹窗询问是否进行毛发处理
+	int ret = MessageBox(NULL, _T("是否进行毛发去除处理？"), _T("提示"), MB_YESNO | MB_ICONQUESTION);
+	if (ret == IDYES)
+	{
+		cv::Mat hairRemoved = RemoveHair();
+		if (!hairRemoved.empty())
+			cvimg = hairRemoved.clone();
+	}
+
 	// 将图像转为灰度
 	cv::Mat gray;
 	if (cvimg.channels() == 3)
@@ -440,4 +447,140 @@ void COpenCVProcess::OpenCVWatershed()
 
 	// 将前景区域保存到cvimg
 	cvimg = foreground.clone();
+}
+
+LesionFeatures COpenCVProcess::ExtractLesionFeatures(const cv::Mat& src, const cv::Mat& mask)
+{
+	LesionFeatures features;
+
+	// 1. 颜色特征提取
+	cv::Mat hsv;
+	cv::cvtColor(src, hsv, cv::COLOR_BGR2HSV);
+
+	cv::Scalar mean, stddev;
+	cv::meanStdDev(src, mean, stddev, mask);
+
+	for (int i = 0; i < 3; i++) {
+		features.colorMean[i] = mean[i];
+		features.colorStd[i] = stddev[i];
+	}
+
+	// 2. 形状特征提取
+	std::vector<std::vector<cv::Point>> contours;
+	cv::findContours(mask.clone(), contours, cv::RETR_EXTERNAL, cv::CHAIN_APPROX_SIMPLE);
+
+	if (!contours.empty()) {
+		// 面积
+		features.area = cv::contourArea(contours[0]);
+
+		// 周长
+		features.perimeter = cv::arcLength(contours[0], true);
+
+		// 圆形度 = 4π*面积/周长^2
+		features.circularity = 4 * CV_PI * features.area / (features.perimeter * features.perimeter);
+
+		// 不规则度
+		cv::RotatedRect minRect = cv::minAreaRect(contours[0]);
+		double rectangleArea = minRect.size.width * minRect.size.height;
+		features.irregularity = rectangleArea / features.area;
+	}
+
+	// 3. 纹理特征提取（使用GLCM - 灰度共生矩阵）
+	cv::Mat gray;
+	cv::cvtColor(src, gray, cv::COLOR_BGR2GRAY);
+
+	cv::Mat glcm = calculateGLCM(gray, mask, 1, 0); // Provide default values for distance and angle
+
+	calculateGLCMFeatures(glcm, features);
+
+	// 4. 边缘特征提取
+	cv::Mat edges;
+	cv::Sobel(gray, edges, CV_32F, 1, 1);
+
+	cv::Mat edgeMagnitude;
+	cv::magnitude(edges, edges, edgeMagnitude);
+
+	cv::Scalar edgeMean = cv::mean(edgeMagnitude, mask);
+	features.edgeGradientMean = edgeMean[0];
+
+	return features;
+}
+
+// 辅助函数：计算GLCM
+cv::Mat COpenCVProcess::calculateGLCM(const cv::Mat& gray, const cv::Mat& mask, int distance = 1, double angle = 0)
+{
+	cv::Mat glcm = cv::Mat::zeros(256, 256, CV_32F);
+	double radian = angle * CV_PI / 180.0;
+	int stepX = static_cast<int>(std::cos(radian) * distance);
+	int stepY = static_cast<int>(std::sin(radian) * distance);
+
+	for (int i = 0; i < gray.rows; i++) {
+		for (int j = 0; j < gray.cols; j++) {
+			if (mask.at<uchar>(i, j) == 0) continue;
+
+			int nextI = i + stepY;
+			int nextJ = j + stepX;
+
+			if (nextI >= 0 && nextI < gray.rows && nextJ >= 0 && nextJ < gray.cols) {
+				if (mask.at<uchar>(nextI, nextJ) > 0) {
+					int intensity1 = gray.at<uchar>(i, j);
+					int intensity2 = gray.at<uchar>(nextI, nextJ);
+					glcm.at<float>(intensity1, intensity2)++;
+				}
+			}
+		}
+	}
+
+	// 归一化GLCM
+	glcm = glcm / cv::sum(glcm)[0];
+
+	return glcm;
+}
+
+// 辅助函数：计算GLCM特征
+void COpenCVProcess::calculateGLCMFeatures(const cv::Mat& glcm, LesionFeatures& features)
+{
+	features.contrast = 0;
+	features.correlation = 0;
+	features.energy = 0;
+	features.homogeneity = 0;
+	features.entropy = 0;
+
+	double meanI = 0, meanJ = 0;
+	double stdI = 0, stdJ = 0;
+
+	// 计算均值
+	for (int i = 0; i < glcm.rows; i++) {
+		for (int j = 0; j < glcm.cols; j++) {
+			float Pij = glcm.at<float>(i, j);
+			meanI += i * Pij;
+			meanJ += j * Pij;
+			features.energy += Pij * Pij;
+		}
+	}
+
+	// 计算标准差
+	for (int i = 0; i < glcm.rows; i++) {
+		for (int j = 0; j < glcm.cols; j++) {
+			float Pij = glcm.at<float>(i, j);
+			stdI += (i - meanI) * (i - meanI) * Pij;
+			stdJ += (j - meanJ) * (j - meanJ) * Pij;
+
+			features.contrast += (i - j) * (i - j) * Pij;
+			features.homogeneity += Pij / (1 + abs(i - j));
+			if (Pij > 0)
+				features.entropy -= Pij * std::log(Pij);
+		}
+	}
+
+	stdI = std::sqrt(stdI);
+	stdJ = std::sqrt(stdJ);
+
+	// 计算相关性
+	for (int i = 0; i < glcm.rows; i++) {
+		for (int j = 0; j < glcm.cols; j++) {
+			float Pij = glcm.at<float>(i, j);
+			features.correlation += ((i - meanI) * (j - meanJ) * Pij) / (stdI * stdJ);
+		}
+	}
 }
