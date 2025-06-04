@@ -33,6 +33,6 @@ public:
 	cv::Mat DistanceTransformNorm(const cv::Mat& src);
 	cv::Mat GetSureForeground(const cv::Mat& dist);
 	cv::Mat GetUnknown(const cv::Mat& fillholes_fg, const cv::Mat& sure_fg);
-	void DrawWatershedBoundary(cv::Mat& img, const cv::Mat& sure_fg, const cv::Mat& unknown);
+	cv::Mat DrawWatershedBoundary(cv::Mat& img, const cv::Mat& sure_fg, const cv::Mat& unknown);
 };
 

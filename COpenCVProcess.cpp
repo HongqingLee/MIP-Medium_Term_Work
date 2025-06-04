@@ -323,7 +323,7 @@ cv::Mat COpenCVProcess::GetUnknown(const cv::Mat&sure_bg , const cv::Mat& sure_f
 	return unknown;
 }
 
-void COpenCVProcess::DrawWatershedBoundary(cv::Mat& img, const cv::Mat& sure_fg, const cv::Mat& unknown)
+cv::Mat COpenCVProcess::DrawWatershedBoundary(cv::Mat& img, const cv::Mat& sure_fg, const cv::Mat& unknown)
 {
 	cv::Mat markers;
 	cv::connectedComponents(sure_fg, markers);
@@ -333,22 +333,29 @@ void COpenCVProcess::DrawWatershedBoundary(cv::Mat& img, const cv::Mat& sure_fg,
 			if (unknown.at<uchar>(i, j) == 255)
 				markers.at<int>(i, j) = 0;
 
-	// 分水岭
-	cv::watershed(img, markers);
-
-	// 绘制分水岭边界
-	int rows = markers.rows;
-	int cols = markers.cols;
-	for (int i = 1; i < rows - 1; i++)
-	{
-		for (int j = 1; j < cols - 1; j++)
+    cv::watershed(img, markers);
+    // 绘制分水岭边界为绿色
+    cv::Mat result;
+    if (img.channels() == 1)
+		cv::cvtColor(img, result, cv::COLOR_GRAY2BGR);
+    else
+		result = img.clone();
+    for (int i = 1; i < markers.rows - 1; ++i)
+    {
+		for (int j = 1; j < markers.cols - 1; ++j)
 		{
 			if (markers.at<int>(i, j) == -1)
 			{
-				img.at<cv::Vec3b>(i, j) = cv::Vec3b(0, 255, 0);
+				result.at<cv::Vec3b>(i, j) = cv::Vec3b(0, 255, 0);
 			}
 		}
-	}
+    }
+	// 提取分水岭边界内的图像区域（即分割出的前景区域）
+	cv::Mat foregroundMask = (markers > 1);
+	foregroundMask.convertTo(foregroundMask, CV_8U, 255); // 转为0/255掩码
+	cv::Mat foreground;
+	result.copyTo(foreground, foregroundMask);
+	return foreground;
 }
 
 void COpenCVProcess::OpenCVWatershed()
@@ -410,10 +417,10 @@ void COpenCVProcess::OpenCVWatershed()
 	}
 	// 执行分水岭算法
 	cv::watershed(result, markers);
-	// 绘制分水岭边界
-	for (int i = 1; i < markers.rows; ++i)
+	// 绘制分水岭边界（不画在图像边界上）
+	for (int i = 1; i < markers.rows - 1; ++i)
 	{
-		for (int j = 1; j < markers.cols; ++j)
+		for (int j = 1; j < markers.cols - 1; ++j)
 		{
 			if (markers.at<int>(i, j) == -1) // 分水岭边界
 			{
@@ -422,6 +429,15 @@ void COpenCVProcess::OpenCVWatershed()
 		}
 	}
 
-	// 将结果保存回cvimg
-	cvimg = result.clone();
+	// 提取分水岭边界内的图像区域（即分割出的前景区域）
+	// 前景区域掩码：markers > 1（背景为1，未知为0，前景为2及以上）
+	cv::Mat foregroundMask = (markers > 1);
+	foregroundMask.convertTo(foregroundMask, CV_8U, 255); // 转为0/255掩码
+
+	// 提取前景区域
+	cv::Mat foreground;
+	result.copyTo(foreground, foregroundMask);
+
+	// 将前景区域保存到cvimg
+	cvimg = foreground.clone();
 }

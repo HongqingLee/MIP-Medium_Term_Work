@@ -48,6 +48,7 @@ protected:
 	cv::Mat m_unknownMat;
 	cv::Mat m_markersMat;
 	cv::Mat m_watershedInput;
+	cv::Mat m_watershedBoundaryMat;
 
 // 生成的消息映射函数
 protected:

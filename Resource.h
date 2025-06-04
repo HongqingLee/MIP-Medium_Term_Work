@@ -36,13 +36,15 @@
 #define ID_WATERSHEDBOUNDARY            32798
 #define ID_32799                        32799
 #define ID_WATERSHED                    32800
+#define ID_32801                        32801
+#define ID_ExtractForeground            32802
 
 // Next default values for new objects
 // 
 #ifdef APSTUDIO_INVOKED
 #ifndef APSTUDIO_READONLY_SYMBOLS
 #define _APS_NEXT_RESOURCE_VALUE        312
-#define _APS_NEXT_COMMAND_VALUE         32801
+#define _APS_NEXT_COMMAND_VALUE         32803
 #define _APS_NEXT_CONTROL_VALUE         1000
 #define _APS_NEXT_SYMED_VALUE           310
 #endif
